@@ -1,0 +1,229 @@
+<!-- 
+1 - preparar os arquivos HTML
+
+--------------------------
+
+2- Fazer os arquivos front (controller em local público) e backand (1=conection(pdo), 2=model, 3=service, 4=controller no desktop)
+
+2.1= conection: uma classe que irá fazer o PDO (new PDO(dsn, user, senha))
+
+2.2 model: uma classe que terá os attr de uma tarefa do mundo real(id, status, descrição e data) e utilizar os métodos mágicos get/set
+
+2.3= service: fazer o CRUD. Uma classe que execute métodos do CRUD, com o __construct() para a execução dos métodos em tempo de interpretação do html
+    2.3.2 O parâmetro do construct é o retorno do PDO(para conexção com o banco) e os valores da model(da classe Task) que tem em si os valores setados pelo usuário
+    2.3.3 Ele vai fazer o CRUD tendo o PDO e os valores dos campos nos seus métodos.
+
+2.4= controller(local): vai requisitar os seus irmãos no ambito publico
+    2.4.2 vai instanciar a classe Task(model) e Conection(PDO) e service(Service).
+    2.4.3 a classe task vai ter SET do atributo $task o que estiver em $_POST[$task], que é o valor que o usuário digitar no campo
+
+--------------------------
+
+3.1 Controller público faz requisição para acessar o mesmo script do Controller Local
+3.2 ***Controller Local faz requisição do service, model e do PDO. A lógica da aplicação, então, pode ser feita a partir do controller***
+3.2.1 A requisição não é direto na pasta local, pois os arquivos estão sendo referenciado já no
+    controller público. 
+
+---------------------------
+
+4.1 Fazer a task_controller local tenha a lógica da aplicação de todas_tarefas.php
+4.1.1 Em todas_tarefas fazer um require de task_controller.php (publica) e adicionar uma variável
+    acima para poder ficar disponível em task_controller.php local. $action = "recover"; 
+                                                                    require "task_controller.php"
+4.2 Em nova_tarefa, adicionar, no endereço de direcionamento do método post, o parametro: <form method="post" action="task_controller.php?action=input">
+    Esse action=input pode ser mudado. É por isso que no passo 4.1.1 tem uma variavel com o valor recover.
+
+4.3 Em task_controller local refaturar o código. $action é criada e recebe o valor condicionalmente. Por padrão, recebe o valor que está no html de nova_tarefa,
+    ou seja, action=input. Se o usuário clicar em todas_tarefa, esse script sobrepõe o valor de action=input para action=recover. então, na controler local
+    $action = isset ($_GET['action']) ? $_GET['action'] : "recover";, ou seja: existe $_GET[action]? Se sim,
+    $input = $_GET['action']((o valo que estiver dentro, no caso, input)). Se não, $action = recover.
+    E no if que seta valor no banco, logo abaixo, ele vai setar valor no banco caso o valor de $action seja = input (se o usuário mandar o formulário, o valor é action=input)
+    Mas caso o valor seja = recover, o scritp executa a mostragem dos valores que estão no banco de dados.  (se o usuário clicar em "todas as tarefas" o valor vai ser $action=recover)
+        Ou seja: $action=input = seta valor no banco; //usuário cadastrou uma tarefa
+                $action=recover = recupera e mostra os valores do banco; //clicou em "Todas as tarefas"
+
+------------------------------------------
+Edição das tarefas 
+
+(front)
+5.1.1 Capturar o click do botão de edicção em todas tarefas e executar o método edit() em JS
+    no script, fazer: Um form de edição, 
+                      Criar um input para a entrada do texto, 
+                      Criar um botão para envio do formulário.
+5.1.2 atribur um ID para o campo HTML a ter o formulário inserido. Como vai ser no forEach, o ID deve ser dinâmico
+    No botão de click, deve ter por parâmetro, o ID específico (feito dinamicamente id="task_<?=$task->id")?>, sendoID o campo ID no banco de dados
+    Assim, quando o usuário clicar no botão X, vai pegar o ID de X e inserir o input na div de mesmo ID. 
+5.1.3 Ao ter o evento do click, o onclick=edit() vai limpar o conteúdo HTML da div respectiva, e inserir o input e o botão.
+    No edit, alem do ID, por o parametro da descrição da tarefa, para que, quando clicado, o campo input não apareça vazio, mas com o conteudo atual da tarefa
+    para a melhor edição do usuário. 
+            onclick="edit(<?= $taskV->id?>, '<?= $taskV->tarefa?>')".
+                        OBS: 1 parametro é o Id, que é INT.
+                            2 parametro é a descrição, que é STRING, então tem que ir em aspas simples
+    no .JS então, passado o parametro na funcção da descrição da tarefa, dar um value para o input, que é o valor atual 
+    da tarefa
+5.1.4 Fazer um input type hidden que irá guardar o id passdo por parametro pela funcao edit()
+
+(back)
+5.2 Enviar pela action do formulário os dados para o backend, passando parametro ?action=update e mudar o if de task_controller local para essa nova condição  
+
+-----------------------------------------
+
+
+
+Fazer CRUD (2.4...)
+
+ Create = public function insert(){ //create
+            $query = 'insert into tb_tarefas(tarefa)values(:taskP)';
+            $stmt = $this->conection->prepare($query);
+            $stmt->bindValue(':taskP', $this->task->__get('task')); 
+            $stmt->execute();
+        }
+
+
+        insere no banco de dados um registro quando o usuario clica em adcionar
+
+Read = public function recovering(){ //read
+            $query = 'SELECT t.id, s.status, t.tarefa 
+                    FROM tb_tarefas AS t
+                    LEFT JOIN tb_status AS s ON(t.id_status = s.id)
+                    
+                    ';
+            $stmt = $this->conection->prepare($query);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_OBJ); //receberá um array de objetos na chamada de recovering()
+            //quando a função for chamada, retorna um array de obj
+        }
+
+        insere na tela os registros cadastrados no banco de dados quando o usuário está na
+        tela de todos as tarefas.
+
+
+        no html:
+        <? foreach ($tasks as $index => $taskV) { ?> 
+			<div class="row mb-3 d-flex align-items-center tarefa">
+                <div class="col-sm-9"><?= $taskV->tarefa?> (<?= $taskV->status?>)</d...
+                    {...}
+            </div>
+
+            para cada registro no banco, irá executar o código html. O array tasks terá apelido de index
+            e cada indice em tasks será igual a taskV, ou seja, indice 1, A B e C: 1 = index. A, B e C = atributos de taskV.
+            taskV->B acesso B; taskV = A, acesso A. $taskV->tarefa = acesso a coluna tarefa da tabela segundo o SQL.
+
+Update (front e back). Update no FRONT: 
+            Ao clicar em edição, a informação da tarefa será substituida por um formulário, que permita que uma nova
+            informação seja digitada e enviada para o servidor.
+
+            fazer um formulário de edição ao clicar o botão de editar (edit.js):
+                                function edit(){
+                                    //criar um form
+                                    let form = document.createElement('form')
+                                    form.action = '#'
+                                    form.method = 'post'
+                                    // criar um input para entrada do texto
+                                    let inputTask = document.createElement('input')
+                                    inputTask.type = 'text'
+                                    inputTask.name = 'inputTask'
+                                    inputTask.className = 'form-control'
+                                    // criar um botão de envio do formulário
+                                    let button = document.createElement('button')
+                                    button.type = 'submit'
+                                    button.className = 'btn btn-info'
+                                    button.innerHTML = 'atualizar'
+                                    // árvore
+                                    form.appendChild(inputTask)
+                                    form.appendChild(button)
+                                }
+
+            No edit(), passar os parametros de ID e de Tarefa (descrição, no db):
+                                No HTML: onclick="edit(<?= $taskV->id?>, '<?= $taskV->tarefa?>')" //edit(idINT, 'descriçãoÉSTRING') 
+                                function edit(id, description){...}
+
+            adicionar um inputHidden para guardar o ID da tarefa que o usuário clicou. O ID é o mesmo do banco de dados, e no backend ele 
+            é quem vai ser uma das referências para a alteração no banco.
+
+                                function edit(id, txt_task){
+                                    //criar um form
+                                    let form = document.createElement('form')
+                                    form.action = '#'
+                                    form.method = 'post'
+                                    form.className = 'row'
+
+                                    // criar um input para entrada do texto
+                                    let inputTask = document.createElement('input')
+                                    inputTask.type = 'text'
+                                    inputTask.name = 'inputTask'
+                                    inputTask.className = 'col-7 form-control mr-1'
+                                    inputTask.value = txt_task
+
+                                    // criar um botão de envio do formulário
+                                    let button = document.createElement('button')
+                                    button.type = 'submit'
+                                    button.className = 'col-2 btn btn-info btn-sm'
+                                    button.innerHTML = 'atualizar'
+
+                                    //Input Hidden que armazena o ID da tarefa clicada
+                                    let inputHiddenID = document.createElement('input')
+                                    inputHiddenID.type = "hidden"
+                                    inputHiddenID.name = 'id'
+                                    inputHiddenID.value = id //passado por parâmetro
+
+                                    // árvore
+                                    form.appendChild(inputTask)
+                                    form.appendChild(inputHiddenID)
+                                    form.appendChild(button)
+
+                                    // selecionar a div tarefa que foi clicada
+                                    let task = document.getElementById('task_'+id) //task_ é o radical da div no html, e ID é o final, que é passado por parametro no evendo do click edit(iddeparametro)
+                                            //limpar o campo html para inclusão do form
+                                            task.innerHTML = ''
+                                            // inclusão do form na página
+                                            task.insertBefore(form, task[0]) 
+                                            //insertBefore insere uma árvore de elementos em uma outra arvore HTML já renderizada
+                                            //dois parametros: (oQueVaiSerInserido, ondeVaiInserir[qualNóFilhoDoElemento])
+                                }
+
+                        Update no BACK-END: 
+enviar via action no form os dados para o back-end. indicar o destino para a task_controllerP, mas que, pelo require, será necessário mexer
+na task_controller local, passando por parametro ?action=uptade.
+                        5.2:  else if ($action == 'update'){ //seta a atualização da tarefa no banco de dados
+
+                                $task = new Task(); //seta os valores do form de edição de tarefa no objeto $task
+                                $task->__set('id', $_POST['id'])
+                                $task->__set('task', $_POST['inputTask'])
+
+                                $conection = new Conection();
+
+                                $taskService = new TaskService($conection, $task); 
+                                $taskService->update();
+                                
+                            }
+    
+e no método update() de TaskSerivice:
+
+    public function update(){ //update
+
+                $query = ' UPDATE tb_tarefas set tarefa = :taskP WHERE id = :id';
+                $stmt = $this->conection->prepare($query); 
+                $stmt->bindValue(':taskP', $this->task->__get('task')); 
+                $stmt->bindValue(':id', $this->task->__get('id'));  //(:parametro, $this->atributoPrivadoTask->__get(oValorDoAtributo$TaskNaClassTaskQueRecebeuOsVDU))
+            $stmt->execute();
+                return $stmt->execute(); //'return' para updates. exectute com sucesso retorna 1, varios executes retorna 'N'
+
+                
+            }
+
+            if final do update passo U no task_controller.php.
+            else if ($action == 'update'){ //seta a atualização da tarefa no banco de dados
+
+                $task = new Task(); //seta os valores do form de edição de tarefa no objeto $task
+                $task->__set('id', $_POST['id']);
+                $task->__set('task', $_POST['inputTask']);
+
+                $conection = new Conection();
+
+                $taskService = new TaskService($conection, $task); 
+                if($taskService->update()) {
+                    header ('Location: todas_tarefas.php'); 
+        }
+                    
+-->
